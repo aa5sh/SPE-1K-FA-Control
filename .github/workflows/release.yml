@@ -69,8 +69,11 @@ jobs:
 
       - name: Create DMG
         run: |
+          mkdir -p dmg_staging
+          cp -R build/SPE1KFAControl.app dmg_staging/
+          ln -s /Applications dmg_staging/Applications
           hdiutil create -volname "SPE 1K-FA Control" \
-            -srcfolder build/SPE1KFAControl.app \
+            -srcfolder dmg_staging \
             -ov -format UDZO \
             SPE1KFAControl-macOS.dmg
 
@@ -147,7 +150,7 @@ jobs:
           arch: 'win64_msvc2022_64'
           modules: 'qtserialport'
           cache: true
-          extra: '--base https://download.qt.io/online/qtsdkrepository/'
+          aqtversion: '==3.1.*'
 
       - name: Configure
         run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
