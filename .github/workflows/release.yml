@@ -159,10 +159,10 @@ jobs:
           $success = $false
           for ($i = 1; $i -le 5; $i++) {
             Write-Host "=== aqt attempt $i ==="
-            python -m aqt install-qt windows desktop 6.7.3 win64_msvc2022_64 `
-              --outputdir $qtDir `
-              --modules qtserialport `
-              --base https://download.qt.io
+          python -m aqt install-qt windows desktop 6.7.2 win64_msvc2022_64 `
+            --outputdir $qtDir `
+            --modules qtserialport `
+            --base https://download.qt.io
             if ($LASTEXITCODE -eq 0) { $success = $true; break }
             Start-Sleep -Seconds 15
           }
