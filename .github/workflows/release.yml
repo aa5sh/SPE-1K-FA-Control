@@ -61,13 +61,7 @@ jobs:
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
-          find build/SPE1KFAControl.app/Contents/Frameworks -name "*.dylib" -o -name "*.framework" | \
-            xargs -I{} codesign --force --verify --verbose \
-              --sign "$MACOS_SIGNING_IDENTITY" \
-              --options runtime \
-              --entitlements entitlements.plist \
-              "{}"
-          codesign --force --verify --verbose \
+          codesign --deep --force --verify --verbose \
             --sign "$MACOS_SIGNING_IDENTITY" \
             --options runtime \
             --entitlements entitlements.plist \
@@ -153,6 +147,7 @@ jobs:
           arch: 'win64_msvc2022_64'
           modules: 'qtserialport'
           cache: true
+          extra: '--base https://download.qt.io/online/qtsdkrepository/'
 
       - name: Configure
         run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
