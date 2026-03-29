@@ -42,7 +42,7 @@ _Connect via the File menu or toolbar, then watch live telemetry stream in._
 brew install qt
 
 # Clone and build
-git clone https://github.com/YOUR_USERNAME/spe-1k-fa-control.git
+git clone https://github.com/aa5sh/spe-1k-fa-control.git
 cd spe-1k-fa-control
 cmake -B build -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
@@ -64,7 +64,7 @@ sudo apt install -y cmake build-essential \
     libgl1-mesa-dev
 
 # Clone and build
-git clone https://github.com/YOUR_USERNAME/spe-1k-fa-control.git
+git clone https://github.com/aa5sh/spe-1k-fa-control.git
 cd spe-1k-fa-control
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
@@ -91,7 +91,7 @@ sudo usermod -a -G dialout $USER
 2. Install [CMake](https://cmake.org/download/) and [Visual Studio 2022](https://visualstudio.microsoft.com/) (Desktop C++ workload)
 
 ```bat
-git clone https://github.com/YOUR_USERNAME/spe-1k-fa-control.git
+git clone https://github.com/aa5sh/spe-1k-fa-control.git
 cd spe-1k-fa-control
 
 cmake -B build -G "Visual Studio 17 2022" -A x64 ^
