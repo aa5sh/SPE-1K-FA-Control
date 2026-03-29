@@ -13,6 +13,9 @@ jobs:
   build-macos:
     name: Build macOS
     runs-on: macos-latest
+    env:
+      HAVE_CERT: ${{ secrets.MACOS_CERTIFICATE != '' && 'true' || '' }}
+      HAVE_NOTARY: ${{ secrets.MACOS_NOTARY_KEY != '' && 'true' || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,7 +33,7 @@ jobs:
         run: cmake --build build --config Release
 
       - name: Import signing certificate
-        if: ${{ secrets.MACOS_CERTIFICATE != '' }}
+        if: env.HAVE_CERT != ''
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
@@ -54,7 +57,7 @@ jobs:
       # --options runtime enables Hardened Runtime, required for notarization.
       # entitlements.plist grants disable-library-validation so Qt plugins load.
       - name: Sign app bundle
-        if: ${{ secrets.MACOS_CERTIFICATE != '' }}
+        if: env.HAVE_CERT != ''
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
@@ -78,14 +81,14 @@ jobs:
             SPE1KFAControl-macOS.dmg
 
       - name: Sign DMG
-        if: ${{ secrets.MACOS_CERTIFICATE != '' }}
+        if: env.HAVE_CERT != ''
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
           codesign --force --sign "$MACOS_SIGNING_IDENTITY" SPE1KFAControl-macOS.dmg
 
       - name: Notarize DMG
-        if: ${{ secrets.MACOS_NOTARY_KEY != '' }}
+        if: env.HAVE_NOTARY != ''
         env:
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
