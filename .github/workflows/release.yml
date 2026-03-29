@@ -137,39 +137,39 @@ jobs:
           name: linux-tarball
           path: SPE1KFAControl-linux-x86_64.tar.gz
 
-build-windows:
-  name: Build Windows
-  runs-on: windows-latest
-  steps:
-    - uses: actions/checkout@v4
-
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v4
-      with:
-        version: '6.7.3'
-        arch: 'win64_msvc2022_64'
-        modules: 'qtserialport'
-        cache: true
-
-    - name: Configure
-      run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
-
-    - name: Build
-      run: cmake --build build --config Release
-
-    - name: Deploy Qt DLLs (windeployqt)
-      shell: cmd
-      run: windeployqt --release build\Release\SPE1KFAControl.exe
-
-    - name: Package (zip)
-      shell: pwsh
-      run: Compress-Archive -Path build\Release\* -DestinationPath SPE1KFAControl-windows-x64.zip
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: windows-zip
-        path: SPE1KFAControl-windows-x64.zip
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+  
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.3'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtserialport'
+          cache: true
+  
+      - name: Configure
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+  
+      - name: Build
+        run: cmake --build build --config Release
+  
+      - name: Deploy Qt DLLs (windeployqt)
+        shell: cmd
+        run: windeployqt --release build\Release\SPE1KFAControl.exe
+  
+      - name: Package (zip)
+        shell: pwsh
+        run: Compress-Archive -Path build\Release\* -DestinationPath SPE1KFAControl-windows-x64.zip
+  
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: SPE1KFAControl-windows-x64.zip
         
   release:
     name: Publish Release
