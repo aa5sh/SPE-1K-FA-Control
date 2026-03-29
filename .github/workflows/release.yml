@@ -148,7 +148,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: D:\Qt
-          key: qt-6.7.3-win64-msvc2022
+          key: qt-6.7.2-win64-msvc2022
 
       - name: Install Qt via aqt
         if: steps.cache-qt.outputs.cache-hit != 'true'
@@ -171,7 +171,7 @@ jobs:
       - name: Set Qt environment
         shell: pwsh
         run: |
-          $qtDir = "D:\Qt\6.7.3\msvc2022_64"
+          $qtDir = "D:\Qt\6.7.2\msvc2022_64"
           Add-Content $env:GITHUB_PATH "$qtDir\bin"
           Add-Content $env:GITHUB_ENV "Qt6_DIR=$qtDir\lib\cmake\Qt6"
           Add-Content $env:GITHUB_ENV "CMAKE_PREFIX_PATH=$qtDir"
