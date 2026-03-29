@@ -143,14 +143,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+      - name: Cache Qt
+        id: cache-qt
+        uses: actions/cache@v4
         with:
-          version: '6.7.3'
-          arch: 'win64_msvc2022_64'
-          modules: 'qtserialport'
-          cache: true
-          aqtversion: '==3.1.*'
+          path: D:\Qt
+          key: qt-6.7.3-win64-msvc2022
+
+      - name: Install Qt via aqt
+        if: steps.cache-qt.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          pip install aqtinstall==3.1.21
+          $qtDir = "D:\Qt"
+          $success = $false
+          for ($i = 1; $i -le 5; $i++) {
+            Write-Host "=== aqt attempt $i ==="
+            python -m aqt install-qt windows desktop 6.7.3 win64_msvc2022_64 `
+              --outputdir $qtDir `
+              --modules qtserialport `
+              --base https://download.qt.io
+            if ($LASTEXITCODE -eq 0) { $success = $true; break }
+            Start-Sleep -Seconds 15
+          }
+          if (-not $success) { exit 1 }
+
+      - name: Set Qt environment
+        shell: pwsh
+        run: |
+          $qtDir = "D:\Qt\6.7.3\msvc2022_64"
+          Add-Content $env:GITHUB_PATH "$qtDir\bin"
+          Add-Content $env:GITHUB_ENV "Qt6_DIR=$qtDir\lib\cmake\Qt6"
+          Add-Content $env:GITHUB_ENV "CMAKE_PREFIX_PATH=$qtDir"
 
       - name: Configure
         run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
@@ -160,13 +184,11 @@ jobs:
 
       - name: Deploy Qt DLLs (windeployqt)
         shell: cmd
-        run: |
-          windeployqt --release build\Release\SPE1KFAControl.exe
+        run: windeployqt --release build\Release\SPE1KFAControl.exe
 
       - name: Package (zip)
         shell: pwsh
-        run: |
-          Compress-Archive -Path build\Release\* -DestinationPath SPE1KFAControl-windows-x64.zip
+        run: Compress-Archive -Path build\Release\* -DestinationPath SPE1KFAControl-windows-x64.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
