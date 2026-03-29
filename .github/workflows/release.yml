@@ -148,18 +148,20 @@ jobs:
         uses: actions/cache@v4
         with:
           path: D:\Qt
-          key: qt-6.7.3-win64-msvc2022
+          key: qt-6.7.0-win64-msvc2022
 
       - name: Install Qt via aqt
         if: steps.cache-qt.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
+          python -m aqt list-qt windows desktop
+          python -m aqt list-qt windows desktop --modules 6.7.0 win64_msvc2022_64
           pip install aqtinstall==3.1.21
           $qtDir = "D:\Qt"
           $success = $false
           for ($i = 1; $i -le 5; $i++) {
             Write-Host "=== aqt attempt $i ==="
-          python -m aqt install-qt windows desktop 6.7.3 win64_msvc2022_64 `
+          python -m aqt install-qt windows desktop 6.7.0 win64_msvc2022_64 `
             --outputdir $qtDir `
             --modules qtserialport `
             --base https://download.qt.io
@@ -171,7 +173,7 @@ jobs:
       - name: Set Qt environment
         shell: pwsh
         run: |
-          $qtDir = "D:\Qt\6.7.3\msvc2022_64"
+          $qtDir = "D:\Qt\6.7.0\msvc2022_64"
           Add-Content $env:GITHUB_PATH "$qtDir\bin"
           Add-Content $env:GITHUB_ENV "Qt6_DIR=$qtDir\lib\cmake\Qt6"
           Add-Content $env:GITHUB_ENV "CMAKE_PREFIX_PATH=$qtDir"
