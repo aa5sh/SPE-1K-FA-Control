@@ -37,6 +37,7 @@ ConnectionDialog::ConnectionDialog(QWidget* parent)
     m_tabs->setCurrentIndex(s.value("conn/tab", 0).toInt());
     m_hostEdit->setText(s.value("conn/tcp/host", "").toString());
     m_portSpin->setValue(s.value("conn/tcp/port", 4000).toInt());
+    m_autoConnectCheck->setChecked(s.value("conn/tcp/autoConnect", false).toBool());
     const QString lastPort = s.value("conn/serial/port", "").toString();
     const int idx = m_portCombo->findText(lastPort);
     if (idx >= 0) m_portCombo->setCurrentIndex(idx);
@@ -90,6 +91,12 @@ void ConnectionDialog::buildTcpTab()
     m_portSpin->setValue(4000);
     layout->addRow(tr("Port:"), m_portSpin);
 
+    m_autoConnectCheck = new QCheckBox(tr("Connect automatically on startup"));
+    m_autoConnectCheck->setToolTip(
+        tr("When checked, the application will attempt to connect to this\n"
+           "host automatically each time it starts."));
+    layout->addRow(QString(), m_autoConnectCheck);
+
     auto* note = new QLabel(
         tr("Connect via a serial-to-TCP adapter.\n"
            "Power on/off via DTR is not available over TCP."));
@@ -134,8 +141,9 @@ void ConnectionDialog::onAccepted()
         // TCP
         if (m_hostEdit->text().trimmed().isEmpty()) return;
 
-        s.setValue("conn/tcp/host", m_hostEdit->text().trimmed());
-        s.setValue("conn/tcp/port", m_portSpin->value());
+        s.setValue("conn/tcp/host",        m_hostEdit->text().trimmed());
+        s.setValue("conn/tcp/port",        m_portSpin->value());
+        s.setValue("conn/tcp/autoConnect", m_autoConnectCheck->isChecked());
 
         auto* conn = new TcpConnection;
         conn->setHost(m_hostEdit->text().trimmed());

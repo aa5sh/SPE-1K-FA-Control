@@ -20,6 +20,7 @@ set(SOURCES
     src/ui/MainWindow.cpp
     src/ui/ConnectionDialog.cpp
     src/ui/AlarmHistoryDialog.cpp
+    src/ui/CompactWindow.cpp
     src/ui/widgets/MeterWidget.cpp
     src/ui/widgets/LedIndicator.cpp
 )

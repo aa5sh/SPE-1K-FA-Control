@@ -10,6 +10,7 @@ class AmplifierController;
 class TelemetryLogger;
 class MeterWidget;
 class AlarmHistoryDialog;
+class CompactWindow;
 
 class MainWindow : public QMainWindow
 {
@@ -33,6 +34,9 @@ private slots:
     void onNak();
     void onDtrToggle();
     void onDtrChanged(bool asserted);
+    void autoConnectIfConfigured();
+    void onSwitchToCompact();
+    void onSwitchToFull();
 
 private:
     void buildMenuBar();
@@ -49,16 +53,18 @@ private:
     QString  formatSetupText(const StatusPacket& s) const;
 
     // Controller + logger
-    AmplifierController* m_controller = nullptr;
-    TelemetryLogger*     m_logger     = nullptr;
-    AlarmHistoryDialog*  m_alarmDlg   = nullptr;
+    AmplifierController* m_controller  = nullptr;
+    TelemetryLogger*     m_logger      = nullptr;
+    AlarmHistoryDialog*  m_alarmDlg    = nullptr;
+    CompactWindow*       m_compactWin  = nullptr;
 
     // Menu actions
-    QAction* m_connectAction    = nullptr;
-    QAction* m_disconnectAction = nullptr;
-    QAction* m_logStartAction   = nullptr;
-    QAction* m_logStopAction    = nullptr;
-    QAction* m_onTopAction      = nullptr;
+    QAction* m_connectAction     = nullptr;
+    QAction* m_disconnectAction  = nullptr;
+    QAction* m_logStartAction    = nullptr;
+    QAction* m_logStopAction     = nullptr;
+    QAction* m_onTopAction       = nullptr;
+    QAction* m_compactViewAction = nullptr;
 
     // Center display widgets
     QLabel*  m_modeBox    = nullptr;  // "STANDBY" / "OPERATE MODE" / "SETUP MODE"
