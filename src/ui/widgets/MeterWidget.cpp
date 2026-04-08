@@ -38,6 +38,18 @@ void MeterWidget::setMaxValue(double maxValue)
     update();
 }
 
+void MeterWidget::setLabel(const QString& label)
+{
+    m_label = label;
+    update();
+}
+
+void MeterWidget::setUnit(const QString& unit)
+{
+    m_unit = unit;
+    update();
+}
+
 void MeterWidget::setPeakHold(bool enabled)
 {
     m_peakHold = enabled;

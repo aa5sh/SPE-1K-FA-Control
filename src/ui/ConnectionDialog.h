@@ -36,8 +36,9 @@ private:
     QCheckBox*        m_dtrCheck  = nullptr;
 
     // TCP tab
-    QLineEdit*        m_hostEdit  = nullptr;
-    QSpinBox*         m_portSpin  = nullptr;
+    QLineEdit*        m_hostEdit        = nullptr;
+    QSpinBox*         m_portSpin        = nullptr;
+    QCheckBox*        m_autoConnectCheck = nullptr;
 
     QDialogButtonBox* m_buttons   = nullptr;
 

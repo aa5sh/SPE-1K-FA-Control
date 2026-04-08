@@ -37,8 +37,12 @@ void TcpConnection::close()
 {
     if (m_socket.state() != QAbstractSocket::UnconnectedState) {
         m_socket.disconnectFromHost();
-        if (m_socket.state() != QAbstractSocket::UnconnectedState)
-            m_socket.waitForDisconnected(1000);
+        if (m_socket.state() != QAbstractSocket::UnconnectedState) {
+            // Some serial-to-TCP adapters don't perform a clean TCP teardown;
+            // abort() forces the close and ensures the disconnected signal fires.
+            if (!m_socket.waitForDisconnected(1000))
+                m_socket.abort();
+        }
     }
 }
 

@@ -1,7 +1,9 @@
 #include "MainWindow.h"
 #include "ConnectionDialog.h"
 #include "AlarmHistoryDialog.h"
+#include "CompactWindow.h"
 #include "connection/AbstractConnection.h"
+#include "connection/TcpConnection.h"
 #include "widgets/MeterWidget.h"
 #include "controller/AmplifierController.h"
 #include "logging/TelemetryLogger.h"
@@ -26,6 +28,8 @@
 #include <QFrame>
 #include <QSizePolicy>
 #include <QApplication>
+#include <QTimer>
+#include <QSettings>
 
 // ─── Style constants ──────────────────────────────────────────────────────────
 
@@ -110,6 +114,11 @@ MainWindow::MainWindow(QWidget* parent)
     m_controller = new AmplifierController(this);
     m_logger     = new TelemetryLogger(this);
     m_alarmDlg   = new AlarmHistoryDialog(this);
+    // Parent = this so Qt auto-deletes on shutdown.
+    // Qt::Window flag in CompactWindow ensures it's still a top-level window.
+    m_compactWin = new CompactWindow(m_controller, this);
+    connect(m_compactWin, &CompactWindow::requestFullView,
+            this, &MainWindow::onSwitchToFull);
 
     connect(m_controller, &AmplifierController::statusUpdated,
             this, &MainWindow::onStatusUpdated);
@@ -148,12 +157,42 @@ MainWindow::MainWindow(QWidget* parent)
         "QStatusBar::item { border: none; }");
 
     updateConnectionUi(false);
+
+    // Schedule auto-connect after the event loop starts so the window is
+    // fully shown before any connection error dialog might appear.
+    QTimer::singleShot(0, this, &MainWindow::autoConnectIfConfigured);
+
+    // Restore always-on-top from the previous session.
+    // Block signals so the toggled handler (which calls show()) doesn't fire
+    // during construction before the window is first shown.
+    {
+        QSettings qs;
+        if (qs.value("view/alwaysOnTop", false).toBool()) {
+            m_onTopAction->blockSignals(true);
+            m_onTopAction->setChecked(true);
+            m_onTopAction->blockSignals(false);
+            setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
+        }
+
+        // Restore the last view mode. Use singleShot so switching happens
+        // after main() calls show() on this window.
+        if (qs.value("view/compactMode", false).toBool()) {
+            // Pre-check the action so it reads correctly if the user somehow
+            // sees the menu before the singleShot fires.
+            m_compactViewAction->blockSignals(true);
+            m_compactViewAction->setChecked(true);
+            m_compactViewAction->blockSignals(false);
+            QTimer::singleShot(0, this, &MainWindow::onSwitchToCompact);
+        }
+    }
 }
 
 MainWindow::~MainWindow() = default;
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
+    m_compactWin->saveGeometry();
+    m_compactWin->hide();   // hide without triggering requestFullView
     m_logger->stop();
     m_controller->disconnectFromAmplifier();
     event->accept();
@@ -184,10 +223,23 @@ void MainWindow::buildMenuBar()
     auto* viewMenu = menuBar()->addMenu(tr("&View"));
     viewMenu->addAction(tr("Alarm History…"), this, &MainWindow::onShowAlarmHistory);
     viewMenu->addSeparator();
+    m_compactViewAction = viewMenu->addAction(tr("Compact View"));
+    m_compactViewAction->setCheckable(true);
+    m_compactViewAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_K));
+    m_compactViewAction->setToolTip(
+        tr("Switch between the full window and the compact meter/control view.\n"
+           "Shortcut: Ctrl+K"));
+    connect(m_compactViewAction, &QAction::toggled, this, [this](bool on) {
+        if (on) onSwitchToCompact();
+        else    onSwitchToFull();
+    });
+    viewMenu->addSeparator();
     m_onTopAction = viewMenu->addAction(tr("Always on Top"));
     m_onTopAction->setCheckable(true);
     m_onTopAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
     connect(m_onTopAction, &QAction::toggled, this, [this](bool on) {
+        QSettings qs;
+        qs.setValue("view/alwaysOnTop", on);
         const Qt::WindowFlags flags = windowFlags();
         if (on)
             setWindowFlags(flags | Qt::WindowStaysOnTopHint);
@@ -689,6 +741,25 @@ void MainWindow::onStatusUpdated(const StatusPacket& s)
         .arg(s.temperature)
         .arg(s.tempCelsius ? 'C' : 'F'));
 
+    // ── TCP "amp is on" indicator ─────────────────────────────────────────────
+    // Over TCP we have no DTR control, but receiving a STATUS packet proves the
+    // amp is powered and responding.  Light the button green so the operator
+    // can see the amp is live (button stays disabled — clicking does nothing).
+    if (!m_controller->supportsDtr()) {
+        m_dtrButton->setText(tr("AMP ON\n(TCP)"));
+        m_dtrButton->setToolTip(
+            tr("Amplifier is on and responding.\n"
+               "Physical power control via DTR is not available over TCP."));
+        m_dtrButton->setStyleSheet(
+            "QPushButton {"
+            "  background:#143a14; color:#60e060;"
+            "  border:1px solid #2a7a2a; border-radius:3px;"
+            "  font-size:9px; font-weight:bold;"
+            "}"
+            "QPushButton:disabled{ background:#0d260d; color:#3a8a3a;"
+            "  border-color:#1a5a1a; }");
+    }
+
     // ── Alarm history auto-update ─────────────────────────────────────────────
     if (s.displayCtx == DisplayContext::AlarmHistory && m_alarmDlg->isVisible())
         m_alarmDlg->updateFromStatus(s);
@@ -766,14 +837,30 @@ QString MainWindow::formatSetupText(const StatusPacket& s) const
     // Show setup menu content mirroring what the amp LCD displays
     switch (s.displayCtx) {
     case DisplayContext::SetupOptions: {
-        const char* items[] = {
-            "ANTENNA","CAT","MANUAL TUNE","BACKLIGHT",
-            "CONTEST","BEEP","START","TEMP.","QUIT"
+        // Items 4-7 are toggle settings whose current state comes from the
+        // FLAGS / STATUS_CODE bytes — show the value next to the name so the
+        // operator can see the current setting without pressing into the sub-menu.
+        struct Item { const char* name; QString value; };
+        const Item items[9] = {
+            {"ANTENNA",     {}},
+            {"CAT",         {}},
+            {"MANUAL TUNE", {}},
+            {"BACKLIGHT",   {}},
+            {"CONTEST",     s.contest        ? "ON"      : "OFF"},
+            {"BEEP",        s.beep           ? "ON"      : "OFF"},
+            {"START",       s.startupOperate ? "OPERATE" : "STANDBY"},
+            {"TEMP.",       s.tempCelsius    ? "\xc2\xb0\x43" : "\xc2\xb0\x46"},
+            {"QUIT",        {}},
         };
         const uint8_t sel = s.setup[1] & 0x0F;
         QString out = "SETUP OPTIONS:\n";
-        for (uint8_t i = 0; i < 9; ++i)
-            out += QString(i == sel ? " ► %1\n" : "   %1\n").arg(items[i]);
+        for (uint8_t i = 0; i < 9; ++i) {
+            const QString suffix = items[i].value.isEmpty()
+                                   ? QString()
+                                   : QString(": %1").arg(items[i].value);
+            out += QString(i == sel ? " \xe2\x96\xba %1%2\n" : "   %1%2\n")
+                       .arg(items[i].name).arg(suffix);
+        }
         return out.trimmed();
     }
     case DisplayContext::SetCat: {
@@ -939,6 +1026,23 @@ QString MainWindow::formatSetupText(const StatusPacket& s) const
         return QString("DISPLAY BACKLIGHT\n- [%1] +\nLevel: %2%  [SET]:SAVE")
                    .arg(bar).arg(pct);
     }
+    case DisplayContext::DataStored: {
+        return QString("DATA STORED");
+    }
+    case DisplayContext::CatInfo: {
+        // Shown when the amp LCD cycles to the CAT / power-control page.
+        // setup[1] carries the PC (power-control) level sent by the exciter
+        // (0–100 for Flex-Radio/Kenwood/Yaesu; typically 0 for other types).
+        QString out = QString("CAT INFO  [IN %1]:\n").arg(s.input + 1);
+        out += QString("  Interface : %1\n").arg(catName(s.catInterface));
+        if (s.catInterface != CatInterface::NONE &&
+            s.catInterface != CatInterface::SPE) {
+            const uint8_t pc = s.setup[1];
+            out += QString("  PC        : %1\n").arg(pc, 3, 10, QChar('0'));
+        }
+        out += QString("  Frequency : %1 MHz").arg(s.frequencyMHz(), 0, 'f', 3);
+        return out.trimmed();
+    }
     case DisplayContext::AlarmHistory: {
         const uint8_t wrnNo = s.setup[0] & 0x0F;
         if (wrnNo == 0) return "ALARM HISTORY: (empty)";
@@ -1036,6 +1140,55 @@ void MainWindow::onDtrToggle()
     }
 
     m_controller->setDtr(newState);
+}
+
+void MainWindow::onSwitchToCompact()
+{
+    QSettings qs;
+    qs.setValue("view/compactMode", true);
+    m_compactViewAction->blockSignals(true);
+    m_compactViewAction->setChecked(true);
+    m_compactViewAction->blockSignals(false);
+    m_compactWin->restoreGeometry();
+    m_compactWin->show();
+    m_compactWin->raise();
+    hide();
+}
+
+void MainWindow::onSwitchToFull()
+{
+    QSettings qs;
+    qs.setValue("view/compactMode", false);
+    m_compactViewAction->blockSignals(true);
+    m_compactViewAction->setChecked(false);
+    m_compactViewAction->blockSignals(false);
+    m_compactWin->saveGeometry();
+    m_compactWin->hide();
+    show();
+    raise();
+    activateWindow();
+}
+
+void MainWindow::autoConnectIfConfigured()
+{
+    QSettings qs;
+    if (!qs.value("conn/tcp/autoConnect", false).toBool())
+        return;
+    const QString host = qs.value("conn/tcp/host").toString().trimmed();
+    if (host.isEmpty())
+        return;
+    const quint16 port = static_cast<quint16>(qs.value("conn/tcp/port", 4000).toInt());
+
+    auto* conn = new TcpConnection;
+    conn->setHost(host);
+    conn->setPort(port);
+    m_controller->setConnection(std::unique_ptr<AbstractConnection>(conn));
+    if (!m_controller->connectToAmplifier()) {
+        QMessageBox::warning(this, tr("Auto-Connect Failed"),
+            tr("Could not connect to %1:%2.\n"
+               "Use File \xe2\x86\x92 Connect to try again.")
+            .arg(host).arg(port));
+    }
 }
 
 void MainWindow::onDtrChanged(bool asserted)

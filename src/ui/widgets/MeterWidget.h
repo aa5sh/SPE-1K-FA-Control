@@ -15,6 +15,8 @@ public:
 
     void setValue(double value);
     void setMaxValue(double maxValue);
+    void setLabel(const QString& label);
+    void setUnit(const QString& unit);
     void setPeakHold(bool enabled);
     void resetPeak();
 
